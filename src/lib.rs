@@ -56,6 +56,30 @@ pub fn logical_screen_descriptor(input:&[u8]) -> IResult<&[u8], LogicalScreenDes
   )
 }
 
+#[derive(Debug,PartialEq,Eq)]
+pub struct Color {
+  r: u8,
+  g: u8,
+  b: u8
+}
+
+pub type GlobalColorTable = Vec<Color>;
+
+pub fn global_color_table(input:&[u8], count: u16) -> IResult<&[u8], GlobalColorTable> {
+
+  count!(input,
+    chain!(
+      r: be_u8 ~
+      g: be_u8 ~
+      b: be_u8 ,
+      || {
+        Color { r: r, g: g, b: b }
+      }
+    ),
+    count
+  )
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -83,9 +107,9 @@ mod tests {
   fn logical_screen_descriptor_test() {
     let d = include_bytes!("../axolotl-piano.gif");
     let data = &d[6..];
-    println!("bytes:\n{}", &data[0..94].to_hex_from(8, d.offset(data)));
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
-    let res = logical_screen_descriptor(&d[6..]);
+    let res = logical_screen_descriptor(&data);
 
 
     match res {
@@ -105,7 +129,27 @@ mod tests {
       },
       e  => {
         println!("error or incomplete: {:?}", e);
-        panic!("cannot parse header");
+        panic!("cannot parse logical screen descriptor");
+      }
+    }
+  }
+
+  #[test]
+  fn global_color_table_test() {
+    let d = include_bytes!("../axolotl-piano.gif");
+    let data = &d[13..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    // we know the color table size
+    let res = global_color_table(data, 256);
+    match res {
+      IResult::Done(i, o) => {
+        println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+        println!("parsed: {:?}", o);
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse global color table");
       }
     }
   }
