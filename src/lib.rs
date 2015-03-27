@@ -6,8 +6,9 @@ extern crate nom;
 use nom::{HexDisplay,Needed,IResult,FlatMapOpt,Functor,FileProducer,be_u8,le_u8,le_u16};
 use nom::{Consumer,ConsumerState};
 use nom::IResult::*;
+use std::num::Int;
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq,Eq)]
 pub struct Gif;
 
 pub fn header(input:&[u8]) -> IResult<&[u8], Gif> {
@@ -21,14 +22,14 @@ pub fn header(input:&[u8]) -> IResult<&[u8], Gif> {
   )
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq,Eq)]
 pub struct LogicalScreenDescriptor {
   width:                  u16,
   height:                 u16,
   gct_flag:               bool,
   color_resolution:       u8,
   gct_sorted:             bool,
-  gct_size:               u8,
+  gct_size:               u16,
   background_color_index: u8,
   pixel_aspect_ratio:     u8
 }
@@ -47,7 +48,7 @@ pub fn logical_screen_descriptor(input:&[u8]) -> IResult<&[u8], LogicalScreenDes
        gct_flag:               fields & 0b10000000 == 0b10000000,
        color_resolution:       (fields & 0b01110000) >> 4,
        gct_sorted:             fields & 0b00001000 == 0b00001000,
-       gct_size:               fields & 0b00000111,
+       gct_size:               2.pow((1 + (fields & 0b00000111)) as u32),
        background_color_index: index,
        pixel_aspect_ratio:     ratio
      }
@@ -91,6 +92,16 @@ mod tests {
       IResult::Done(i, o) => {
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
+        assert_eq!(o, LogicalScreenDescriptor {
+          width:                  400,
+          height:                 300,
+          gct_flag:               true,
+          color_resolution:       7,
+          gct_sorted:             false,
+          gct_size:               256,
+          background_color_index: 255,
+           pixel_aspect_ratio:    0
+        });
       },
       e  => {
         println!("error or incomplete: {:?}", e);
