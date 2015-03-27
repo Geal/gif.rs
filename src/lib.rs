@@ -1,12 +1,13 @@
-#![feature(core)]
+#![feature(core,trace_macros)]
 
 #[macro_use]
 extern crate nom;
 
-use nom::{HexDisplay,Needed,IResult,FlatMapOpt,Functor,FileProducer,be_u8,le_u8,le_u16};
+use nom::{HexDisplay,Needed,IResult,FlatMapOpt,Functor,FileProducer,be_u8,le_u8,le_u16,length_value};
 use nom::{Consumer,ConsumerState};
 use nom::IResult::*;
 use std::num::Int;
+use std::str::from_utf8;
 
 #[derive(Debug,PartialEq,Eq)]
 pub struct Gif;
@@ -77,6 +78,48 @@ pub fn global_color_table(input:&[u8], count: u16) -> IResult<&[u8], GlobalColor
       }
     ),
     count
+  )
+}
+
+#[derive(Debug,PartialEq,Eq)]
+pub struct Application<'a> {
+  identifier:          &'a str,
+  authentication_code: &'a [u8],
+  data:                &'a [u8]
+}
+
+#[derive(Debug,PartialEq,Eq)]
+pub enum Block<'a> {
+  GraphicBlock,
+  ApplicationExtension(Application<'a>),
+  CommentExtension
+}
+
+
+pub fn application_extension<'a>(input: &'a[u8]) -> IResult<&'a[u8], Block<'a>> {
+  chain!(input,
+    tag!( &[0xff, 11][..] )                   ~
+    identifier: map_res!(take!(8), from_utf8) ~
+    code: take!(3)                            ~
+    data: length_value                        ~
+    tag!( &[0][..] )                          ,
+    || { Block::ApplicationExtension(Application{
+      identifier:          identifier,
+      authentication_code: code,
+      data:                data
+    }) }
+  )
+}
+
+pub fn block(input:&[u8]) -> IResult<&[u8], Block> {
+  chain!(input,
+    tag!( "!" ) ~
+  blk: alt!(
+    application_extension
+  ),
+  || {
+    blk
+  }
   )
 }
 
@@ -154,4 +197,24 @@ mod tests {
     }
   }
 
+  #[test]
+  fn block_test() {
+    let d = include_bytes!("../axolotl-piano.gif");
+    let data = &d[781..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    let res = block(data);
+    match res {
+      IResult::Done(i, o) => {
+        println!("offset: {:?}", d.offset(i));
+        println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+        println!("parsed: {:?}", o);
+        panic!("hello");
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse global color table");
+      }
+    }
+  }
 }
