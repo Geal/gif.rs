@@ -1,14 +1,16 @@
+#![feature(core)]
+
 #[macro_use]
 extern crate nom;
 
-use nom::{HexDisplay,Needed,IResult,FlatMapOpt,Functor,FileProducer,be_u16,be_u32,be_u64,be_f32};
+use nom::{HexDisplay,Needed,IResult,FlatMapOpt,Functor,FileProducer,be_u8,le_u8,le_u16};
 use nom::{Consumer,ConsumerState};
 use nom::IResult::*;
 
+#[derive(Debug)]
 pub struct Gif;
 
 pub fn header(input:&[u8]) -> IResult<&[u8], Gif> {
-
   chain!(input,
     tag!("GIF")     ~
     alt!(
@@ -17,7 +19,40 @@ pub fn header(input:&[u8]) -> IResult<&[u8], Gif> {
    )                ,
    || { Gif }
   )
-  //Done(input, Gif )
+}
+
+#[derive(Debug)]
+pub struct LogicalScreenDescriptor {
+  width:                  u16,
+  height:                 u16,
+  gct_flag:               bool,
+  color_resolution:       u8,
+  gct_sorted:             bool,
+  gct_size:               u8,
+  background_color_index: u8,
+  pixel_aspect_ratio:     u8
+}
+
+pub fn logical_screen_descriptor(input:&[u8]) -> IResult<&[u8], LogicalScreenDescriptor> {
+  chain!(input,
+    width:  le_u16 ~
+    height: le_u16 ~
+    fields: be_u8  ~
+    index:  be_u8  ~
+    ratio:  be_u8  ,
+   || {
+     LogicalScreenDescriptor {
+       width:                  width,
+       height:                 height,
+       gct_flag:               fields & 0b10000000 == 0b10000000,
+       color_resolution:       (fields & 0b01110000) >> 4,
+       gct_sorted:             fields & 0b00001000 == 0b00001000,
+       gct_size:               fields & 0b00000111,
+       background_color_index: index,
+       pixel_aspect_ratio:     ratio
+     }
+   }
+  )
 }
 
 #[cfg(test)]
@@ -26,19 +61,42 @@ mod tests {
   use nom::{HexDisplay,IResult};
 
   #[test]
-  fn test() {
+  fn header_test() {
     let data = include_bytes!("../axolotl-piano.gif");
-    println!("bytes:\n {}", &data[0..100].to_hex(8));
+    println!("bytes:\n{}", &data[0..100].to_hex(8));
     let res = header(data);
 
 
     match res {
       IResult::Done(i, o) => {
-        println!("remaining:\n {}", &i[0..100].to_hex(8));
+        println!("remaining:\n{}", &i[0..100].to_hex(8));
       },
-      _  => { println!("error or incomplete") }
+      _  => {
+        println!("error or incomplete");
+        panic!("cannot parse header");
+      }
     }
-    panic!("abc");
+  }
+
+  #[test]
+  fn logical_screen_descriptor_test() {
+    let d = include_bytes!("../axolotl-piano.gif");
+    let data = &d[6..];
+    println!("bytes:\n{}", &data[0..94].to_hex_from(8, d.offset(data)));
+
+    let res = logical_screen_descriptor(&d[6..]);
+
+
+    match res {
+      IResult::Done(i, o) => {
+        println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+        println!("parsed: {:?}", o);
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse header");
+      }
+    }
   }
 
 }
