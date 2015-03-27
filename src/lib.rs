@@ -66,8 +66,7 @@ pub struct Color {
 
 pub type GlobalColorTable = Vec<Color>;
 
-pub fn global_color_table(input:&[u8], count: u16) -> IResult<&[u8], GlobalColorTable> {
-
+pub fn color_table(input:&[u8], count: u16) -> IResult<&[u8], GlobalColorTable> {
   count!(input,
     chain!(
       r: be_u8 ~
@@ -89,8 +88,32 @@ pub struct Application<'a> {
 }
 
 #[derive(Debug,PartialEq,Eq)]
+pub struct GraphicControl {
+  disposal_method:    u8,
+  user_input:         bool,
+  transparency:       bool,
+  delay_time:         u16,
+  transparency_index: u8
+}
+
+pub type LocalColorTable = Vec<Color>;
+
+#[derive(Debug,PartialEq,Eq)]
+pub struct ImageDescriptor {
+  left_position:          u16,
+  top_position:           u16,
+  width:                  u16,
+  height:                 u16,
+  local_color_table_flag: bool,
+  interlace:              bool,
+  sort:                   bool,
+  local_color_table_size: u8,
+  local_color_table:      Option<LocalColorTable>
+}
+
+#[derive(Debug,PartialEq,Eq)]
 pub enum Block<'a> {
-  GraphicBlock,
+  GraphicBlock(Option<GraphicControl>, ImageDescriptor),
   ApplicationExtension(Application<'a>),
   CommentExtension
 }
@@ -98,24 +121,96 @@ pub enum Block<'a> {
 
 pub fn application_extension<'a>(input: &'a[u8]) -> IResult<&'a[u8], Block<'a>> {
   chain!(input,
-    tag!( &[0xff, 11][..] )                   ~
+                tag!( &[0xff, 11][..] )       ~
     identifier: map_res!(take!(8), from_utf8) ~
-    code: take!(3)                            ~
-    data: length_value                        ~
-    tag!( &[0][..] )                          ,
-    || { Block::ApplicationExtension(Application{
-      identifier:          identifier,
-      authentication_code: code,
-      data:                data
-    }) }
+    code:       take!(3)                      ~
+    data:       length_value                  ~
+                tag!( &[0][..] )              ,
+    || {
+      Block::ApplicationExtension(Application{
+        identifier:          identifier,
+        authentication_code: code,
+        data:                data
+      })
+    }
   )
 }
+
+named!(graphic_control<&[u8], GraphicControl>,
+  chain!(
+                  tag!( &[0xf9, 4][..] ) ~
+    fields:       be_u8                  ~
+    delay:        le_u16                 ~
+    transparency: be_u8                  ~
+                  tag!( &[0][..] )       ,
+    || {
+      GraphicControl {
+        disposal_method:    (fields & 0b00011100) >> 2,
+        user_input:         fields & 0b00000010 == 0b00000010,
+        transparency:       fields & 0b00000001 == 0b00000001,
+        delay_time:         delay,
+        transparency_index: transparency
+      }
+    }
+  )
+);
+
+named!(image_descriptor<&[u8], ImageDescriptor>,
+
+  chain!(
+            tag!( &[0x2C][..] ) ~
+    left:   le_u16              ~
+    top:    le_u16              ~
+    width:  le_u16              ~
+    height: le_u16              ~
+    fields: be_u8               ~
+    color_table:
+      cond!(
+        fields & 0b10000000 == 0b10000000,
+        count!(
+          chain!(
+            r: be_u8 ~
+            g: be_u8 ~
+            b: be_u8 ,
+            || {
+              Color { r: r, g: g, b: b }
+            }
+          ),
+          2.pow((1 + (fields & 0b00000111)) as u32)
+        )
+      ),
+    || {
+      ImageDescriptor{
+        left_position:          left,
+        top_position:           top,
+        width:                  width,
+        height:                 height,
+        local_color_table_flag: fields & 0b10000000 == 0b10000000,
+        interlace:              fields & 0b01000000 == 0b01000000,
+        sort:                   fields & 0b00100000 == 0b00100000,
+        local_color_table_size: 2.pow((1 + (fields & 0b00000111)) as u32),
+        local_color_table:      color_table
+      }
+    }
+  )
+);
+
+named!(graphic_block<&[u8], Block>,
+  chain!(
+    control: graphic_control ?   ~
+    descriptor: image_descriptor ,
+    || {
+      Block::GraphicBlock(control, descriptor)
+    }
+  )
+);
 
 pub fn block(input:&[u8]) -> IResult<&[u8], Block> {
   chain!(input,
     tag!( "!" ) ~
   blk: alt!(
     application_extension
+  | graphic_block
   ),
   || {
     blk
@@ -138,6 +233,7 @@ mod tests {
     match res {
       IResult::Done(i, o) => {
         println!("remaining:\n{}", &i[0..100].to_hex(8));
+        println!("parsed: {:?}", o);
       },
       _  => {
         println!("error or incomplete");
@@ -178,13 +274,13 @@ mod tests {
   }
 
   #[test]
-  fn global_color_table_test() {
+  fn color_table_test() {
     let d = include_bytes!("../axolotl-piano.gif");
     let data = &d[13..];
     println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
     // we know the color table size
-    let res = global_color_table(data, 256);
+    let res = color_table(data, 256);
     match res {
       IResult::Done(i, o) => {
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
@@ -198,9 +294,29 @@ mod tests {
   }
 
   #[test]
-  fn block_test() {
+  fn application_block_test() {
     let d = include_bytes!("../axolotl-piano.gif");
     let data = &d[781..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    let res = block(data);
+    match res {
+      IResult::Done(i, o) => {
+        println!("offset: {:?}", d.offset(i));
+        println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+        println!("parsed: {:?}", o);
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse global color table");
+      }
+    }
+  }
+
+  #[test]
+  fn graphic_block_test() {
+    let d = include_bytes!("../axolotl-piano.gif");
+    let data = &d[800..];
     println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
     let res = block(data);
