@@ -275,6 +275,10 @@ pub fn block(input:&[u8]) -> IResult<&[u8], Block> {
   )
 }
 
+pub fn many_blocks(i: &[u8]) -> IResult<&[u8],Vec<Block> > {
+  many0!(i, block)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -380,9 +384,9 @@ mod tests {
     match res {
       IResult::Done(i, o) => {
         println!("offset: {:?}", d.offset(i));
-        println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
-        panic!("hello");
+        println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+        //panic!("hello");
       },
       e  => {
         println!("error or incomplete: {:?}", e);
@@ -390,4 +394,27 @@ mod tests {
       }
     }
   }
+
+  #[test]
+  fn multiple_blocks_test() {
+    let d = include_bytes!("../axolotl-piano.gif");
+    let data = &d[781..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    let res = many_blocks(data);
+    match res {
+      IResult::Done(i, o) => {
+        println!("offset: {:?}", d.offset(i));
+        println!("parsed: {:?}", o);
+        println!("remaining:\n{}", i.to_hex(8));
+        //panic!("hello");
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse global color table");
+      }
+    }
+  }
+
+
 }
