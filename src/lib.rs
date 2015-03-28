@@ -112,8 +112,14 @@ pub struct ImageDescriptor {
 }
 
 #[derive(Debug,PartialEq,Eq)]
+pub enum GraphicRenderingBlock<'a> {
+  TableBasedImage(ImageDescriptor, u8, Vec<&'a [u8]>),
+  PlainTextExtension
+}
+
+#[derive(Debug,PartialEq,Eq)]
 pub enum Block<'a> {
-  GraphicBlock(Option<GraphicControl>, ImageDescriptor),
+  GraphicBlock(Option<GraphicControl>, GraphicRenderingBlock<'a>),
   ApplicationExtension(Application<'a>),
   CommentExtension
 }
@@ -195,12 +201,63 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
   )
 );
 
+pub fn not_null(input: &[u8]) -> IResult<&[u8], u8> {
+  if input.len() == 0 {
+    IResult::Incomplete(Needed::Size(1))
+  } else if input[0] == 0 {
+    IResult::Error(0)
+  } else {
+    IResult::Done(&input[1..], input[0])
+  }
+}
+
+pub fn not_null_length_value(input:&[u8]) -> IResult<&[u8], &[u8]> {
+  let input_len = input.len();
+  if input_len == 0 {
+    return IResult::Error(0)
+  }
+  if input[0] == 0 {
+    println!("found empty sub block");
+    return IResult::Error(0)
+  }
+
+  let len = input[0] as usize;
+  if input_len - 1 >= len {
+    return IResult::Done(&input[len+1..], &input[1..len+1])
+  } else {
+    return IResult::Incomplete(Needed::Size(1+len as u32))
+  }
+}
+
+named!(sub_blocks<&[u8], Vec<&[u8]> >,
+  many0!( not_null_length_value )
+);
+
+named!(table_based_image<&[u8], GraphicRenderingBlock>,
+  chain!(
+    descriptor:    image_descriptor ~
+    lzw_code_size: be_u8            ~
+    compressed:    sub_blocks       ~
+                tag!( &[0][..] )    ,
+    || {
+      GraphicRenderingBlock::TableBasedImage(descriptor, lzw_code_size, compressed)
+    }
+  )
+);
+named!(graphic_rendering_block<&[u8], GraphicRenderingBlock>,
+  alt!(
+    table_based_image
+    //image_descriptor => { |image| GraphicRenderingBlock::TableBasedImage(image) }
+  //| tag!("abcd")     =>  |a| { GraphicRenderingBlock::PlainTextExtension }
+  )
+);
+
 named!(graphic_block<&[u8], Block>,
   chain!(
-    control: graphic_control ?   ~
-    descriptor: image_descriptor ,
+    control:   graphic_control ?       ~
+    rendering: graphic_rendering_block ,
     || {
-      Block::GraphicBlock(control, descriptor)
+      Block::GraphicBlock(control, rendering)
     }
   )
 );
