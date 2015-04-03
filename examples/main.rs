@@ -116,7 +116,7 @@ pub fn buf_to_colors(input: &buffer[u8], row_size: u8) -> Vec< Vec<u8> > {
 }
 
 pub fn decode_gif () -> Vec< Vec<u8> > {
-  let d = include_bytes!("../axolotl-piano.gif");
+  let d = include_bytes!("../assets/axolotl-piano.gif");
   let data = &d[13..];
   println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 

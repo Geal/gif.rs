@@ -300,7 +300,7 @@ mod tests {
 
   #[test]
   fn header_test() {
-    let data = include_bytes!("../axolotl-piano.gif");
+    let data = include_bytes!("../assets/axolotl-piano.gif");
     println!("bytes:\n{}", &data[0..100].to_hex(8));
     let res = header(data);
 
@@ -319,7 +319,7 @@ mod tests {
 
   #[test]
   fn logical_screen_descriptor_test() {
-    let d = include_bytes!("../axolotl-piano.gif");
+    let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[6..];
     println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
@@ -350,7 +350,7 @@ mod tests {
 
   #[test]
   fn color_table_test() {
-    let d = include_bytes!("../axolotl-piano.gif");
+    let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[13..];
     println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
@@ -370,7 +370,7 @@ mod tests {
 
   #[test]
   fn application_block_test() {
-    let d = include_bytes!("../axolotl-piano.gif");
+    let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[781..];
     println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
@@ -390,7 +390,7 @@ mod tests {
 
   #[test]
   fn graphic_block_test() {
-    let d = include_bytes!("../axolotl-piano.gif");
+    let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[800..];
     println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
@@ -411,7 +411,7 @@ mod tests {
 
   #[test]
   fn multiple_blocks_test() {
-    let d = include_bytes!("../axolotl-piano.gif");
+    let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[781..];
     println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
@@ -432,7 +432,7 @@ mod tests {
 
   #[test]
   fn decode_lzw_test() {
-    let d = include_bytes!("../axolotl-piano.gif");
+    let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[13..];
     println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
