@@ -1,10 +1,12 @@
-#![feature(core,trace_macros)]
+#![feature(core,collections,trace_macros)]
+
+pub mod lzw;
 
 #[macro_use]
 extern crate nom;
 
-use nom::{HexDisplay,Needed,IResult,FlatMapOpt,Functor,FileProducer,be_u8,le_u8,le_u16,length_value};
-use nom::{Consumer,ConsumerState};
+use nom::{HexDisplay,Needed,IResult,be_u8,le_u16,length_value};
+use nom::{Consumer};
 use nom::IResult::*;
 use std::num::Int;
 use std::str::from_utf8;
@@ -57,12 +59,13 @@ pub fn logical_screen_descriptor(input:&[u8]) -> IResult<&[u8], LogicalScreenDes
   )
 }
 
-#[derive(Debug,PartialEq,Eq)]
-pub struct Color {
+//#[derive(Debug,PartialEq,Eq)]
+pub type Color = Vec<u8>;
+/*pub struct Color {
   r: u8,
   g: u8,
   b: u8
-}
+}*/
 
 pub type GlobalColorTable = Vec<Color>;
 
@@ -73,7 +76,12 @@ pub fn color_table(input:&[u8], count: u16) -> IResult<&[u8], GlobalColorTable> 
       g: be_u8 ~
       b: be_u8 ,
       || {
-        Color { r: r, g: g, b: b }
+        let mut v: Vec<u8> = Vec::new();
+        v.push(r);
+        v.push(g);
+        v.push(b);
+        //Color { r: r, g: g, b: b }
+        v
       }
     ),
     count
@@ -179,7 +187,12 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
             g: be_u8 ~
             b: be_u8 ,
             || {
-              Color { r: r, g: g, b: b }
+              //Color { r: r, g: g, b: b }
+              let mut v: Vec<u8> = Vec::new();
+              v.push(r);
+              v.push(g);
+              v.push(b);
+              v
             }
           ),
           2.pow((1 + (fields & 0b00000111)) as u32)
@@ -252,15 +265,15 @@ named!(graphic_rendering_block<&[u8], GraphicRenderingBlock>,
   )
 );
 
-named!(graphic_block<&[u8], Block>,
-  chain!(
+pub fn graphic_block(input:&[u8]) -> IResult<&[u8], Block> {
+  chain!(input,
     control:   graphic_control ?       ~
     rendering: graphic_rendering_block ,
     || {
       Block::GraphicBlock(control, rendering)
     }
   )
-);
+}
 
 pub fn block(input:&[u8]) -> IResult<&[u8], Block> {
   chain!(input,
@@ -282,6 +295,7 @@ pub fn many_blocks(i: &[u8]) -> IResult<&[u8],Vec<Block> > {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use lzw::*;
   use nom::{HexDisplay,IResult};
 
   #[test]
@@ -416,5 +430,53 @@ mod tests {
     }
   }
 
+  #[test]
+  fn decode_lzw_test() {
+    let d = include_bytes!("../axolotl-piano.gif");
+    let data = &d[13..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    // we know the color table size
+    match color_table(data, 256) {
+      IResult::Done(i, colors) => {
+        //println!("parsed: {:?}", colors);
+        // allocate the image
+        let mut buffer: Vec<u8> = Vec::with_capacity(400 * 300 * 3);
+        unsafe { buffer.set_len(400 * 300 * 3); }
+
+        let data = &d[801..];
+        //println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+        match graphic_block(data) {
+          IResult::Done(i, Block::GraphicBlock(opt_control, rendering)) => {
+            //let (opt_control, rendering) = grb;
+            match rendering {
+              GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
+                match lzw::decode_lzw(colors, code_size, blocks, &mut buffer[..]) {
+                  Some(nb) => {
+                    println!("decoded the image({} bytes):\n{}", nb, buffer.to_hex(8));
+                    panic!("correctly decoded")
+                  },
+                  _ => panic!("could not decode")
+                }
+              },
+              _ => {
+                panic!("plaintext extension");
+              }
+            }
+          },
+          e  => {
+            println!("error or incomplete: {:?}", e);
+            panic!("cannot parse graphic block");
+          }
+
+        }
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse global color table");
+      }
+    }
+  }
 
 }
