@@ -3,12 +3,17 @@ name = "gif-display-example"
 version = "0.0.1"
 authors = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]
 
+[dependencies]
+nom     = "~0.2.0"
+
 [dependencies.gif]
 path = ".."
 version = "*"
 
 [dependencies.glium_graphics]
-git = "https://github.com/PistonDevelopers/glium_graphics"
+#git = "https://github.com/PistonDevelopers/glium_graphics"
+git = "https://github.com/Geal/glium_graphics"
+branch = "update-graphics"
 
 [dependencies.freetype-rs]
 git = "https://github.com/PistonDevelopers/freetype-rs"

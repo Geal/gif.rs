@@ -22,8 +22,8 @@ pub fn header(input:&[u8]) -> IResult<&[u8], Gif> {
 
 #[derive(Debug,PartialEq,Eq)]
 pub struct LogicalScreenDescriptor {
-  width:                  u16,
-  height:                 u16,
+  pub  width:                  u16,
+  pub  height:                 u16,
   gct_flag:               bool,
   color_resolution:       u8,
   gct_sorted:             bool,
@@ -51,6 +51,14 @@ pub fn logical_screen_descriptor(input:&[u8]) -> IResult<&[u8], LogicalScreenDes
        pixel_aspect_ratio:     ratio
      }
    }
+  )
+}
+
+pub fn header_and_logical_screen_descriptor(input: &[u8]) -> IResult<&[u8], LogicalScreenDescriptor> {
+  chain!(input,
+                header                    ~
+    descriptor: logical_screen_descriptor ,
+                || { descriptor }
   )
 }
 
@@ -450,7 +458,7 @@ mod tests {
                 match lzw::decode_lzw(colors, code_size, blocks, &mut buffer[..]) {
                   Some(nb) => {
                     println!("decoded the image({} bytes):\n{}", nb, buffer.to_hex(8));
-                    panic!("correctly decoded")
+                    //panic!("correctly decoded")
                   },
                   _ => panic!("could not decode")
                 }
