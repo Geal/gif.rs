@@ -1,6 +1,6 @@
 #![feature(core,collections,trace_macros)]
 
-use nom::{HexDisplay,Needed,IResult,be_u8,le_u16,length_value};
+use nom::{HexDisplay,Needed,IResult,be_u8,le_u8,le_u16,length_value};
 use nom::{Consumer};
 use nom::IResult::*;
 use std::num::Int;
@@ -118,7 +118,7 @@ pub struct ImageDescriptor {
   local_color_table_flag: bool,
   interlace:              bool,
   sort:                   bool,
-  local_color_table_size: u8,
+  local_color_table_size: u32,
   local_color_table:      Option<LocalColorTable>
 }
 
@@ -235,10 +235,13 @@ pub fn not_null_length_value(input:&[u8]) -> IResult<&[u8], &[u8]> {
   if input[0] == 0 {
     println!("found empty sub block");
     return IResult::Error(0)
+    //return IResult::Done(&input[1..], b"")
   }
 
   let len = input[0] as usize;
   if input_len - 1 >= len {
+    println!("found {} length in:\n{}", len, (&input[0..len+1]).to_hex(8));
+    println!("remaining:\n{}", (&input[len+1..len+20]).to_hex(8));
     return IResult::Done(&input[len+1..], &input[1..len+1])
   } else {
     return IResult::Incomplete(Needed::Size(1+len as u32))
@@ -252,7 +255,7 @@ named!(sub_blocks<&[u8], Vec<&[u8]> >,
 named!(table_based_image<&[u8], GraphicRenderingBlock>,
   chain!(
     descriptor:    image_descriptor ~
-    lzw_code_size: be_u8            ~
+    lzw_code_size: le_u8            ~
     compressed:    sub_blocks       ~
                 tag!( &[0][..] )    ,
     || {
@@ -269,6 +272,7 @@ named!(graphic_rendering_block<&[u8], GraphicRenderingBlock>,
 );
 
 pub fn graphic_block(input:&[u8]) -> IResult<&[u8], Block> {
+  println!("data for graphic block:\n{}", &input[..100].to_hex(8));
   chain!(input,
     control:   graphic_control ?       ~
     rendering: graphic_rendering_block ,
@@ -321,6 +325,25 @@ mod tests {
   }
 
   #[test]
+  fn header_test2() {
+    let data = include_bytes!("../assets/test.gif");
+    println!("bytes:\n{}", &data[0..100].to_hex(8));
+    let res = header(data);
+
+
+    match res {
+      IResult::Done(i, o) => {
+        println!("remaining:\n{}", &i[0..100].to_hex(8));
+        println!("parsed: {:?}", o);
+      },
+      _  => {
+        println!("error or incomplete");
+        panic!("cannot parse header");
+      }
+    }
+  }
+
+  #[test]
   fn logical_screen_descriptor_test() {
     let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[6..];
@@ -352,6 +375,37 @@ mod tests {
   }
 
   #[test]
+  fn logical_screen_descriptor_test2() {
+    let d = include_bytes!("../assets/test.gif");
+    let data = &d[6..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    let res = logical_screen_descriptor(&data);
+
+
+    match res {
+      IResult::Done(i, o) => {
+        println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+        println!("parsed: {:?}", o);
+        assert_eq!(o, LogicalScreenDescriptor {
+          width:                  2,
+          height:                 2,
+          gct_flag:               true,
+          color_resolution:       7,
+          gct_sorted:             false,
+          gct_size:               256,
+          background_color_index: 0,
+           pixel_aspect_ratio:    0
+        });
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse logical screen descriptor");
+      }
+    }
+  }
+
+  #[test]
   fn color_table_test() {
     let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[13..];
@@ -372,6 +426,28 @@ mod tests {
   }
 
   #[test]
+  fn color_table_test2() {
+    let d = include_bytes!("../assets/test.gif");
+    let data = &d[13..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    // we know the color table size
+    let res = color_table(data, 256);
+    match res {
+      IResult::Done(i, o) => {
+        println!("offset: {:?}", d.offset(i));
+        //println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+        println!("parsed: {:?}", o);
+        //panic!("hello");
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse global color table");
+      }
+    }
+  }
+
+  #[test]
   fn application_block_test() {
     let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[781..];
@@ -383,6 +459,30 @@ mod tests {
         println!("offset: {:?}", d.offset(i));
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
+        assert_eq!(Block::ApplicationExtension(Application {identifier: "NETSCAPE", authentication_code: &[50, 46, 48][..], data: &[1, 0, 0][..] }),
+          o);
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse global color table");
+      }
+    }
+  }
+
+  #[test]
+  fn application_block_test2() {
+    let d = include_bytes!("../assets/test.gif");
+    let data = &d[781..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    let res = block(data);
+    match res {
+      IResult::Done(i, o) => {
+        println!("offset: {:?}", d.offset(i));
+        println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+        println!("parsed: {:?}", o);
+        assert_eq!(Block::ApplicationExtension(Application {identifier: "NETSCAPE", authentication_code: &[50, 46, 48][..], data: &[1, 0, 0][..] }),
+          o);
       },
       e  => {
         println!("error or incomplete: {:?}", e);
@@ -413,6 +513,41 @@ mod tests {
   }
 
   #[test]
+  fn graphic_block_test2() {
+    let d = include_bytes!("../assets/test.gif");
+    let data = &d[800..];
+    println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+    let res = block(data);
+    match res {
+      IResult::Done(i, o) => {
+        println!("offset1: {:?}", d.offset(i));
+        println!("parsed1: {:?}", o);
+        //println!("remaining1:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
+
+        let res2 = block(i);
+        match res2 {
+          IResult::Done(i2, o2) => {
+            println!("offset2: {:?}", d.offset(i2));
+            println!("parsed2: {:?}", o2);
+            //println!("remaining2:\n{}", &i2[0..100].to_hex_from(8, d.offset(i2)));
+            //println!("remaining2:\n{}", &i2.to_hex(8));
+            //panic!("hello");
+          },
+          e  => {
+            println!("error or incomplete: {:?}", e);
+            panic!("cannot parse graphic block");
+          }
+        }
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse graphic block");
+      }
+    }
+  }
+
+  /*#[test]
   fn multiple_blocks_test() {
     let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[781..];
@@ -431,8 +566,8 @@ mod tests {
         panic!("cannot parse global color table");
       }
     }
-  }
-
+  }*/
+/*
   #[test]
   fn decode_lzw_test() {
     let d = include_bytes!("../assets/axolotl-piano.gif");
@@ -455,8 +590,8 @@ mod tests {
             //let (opt_control, rendering) = grb;
             match rendering {
               GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
-                match lzw::decode_lzw(colors, code_size, blocks, &mut buffer[..]) {
-                  Some(nb) => {
+                match lzw::decode_lzw(colors, code_size as usize, blocks, &mut buffer[..]) {
+                  Ok(nb) => {
                     println!("decoded the image({} bytes):\n{}", nb, buffer.to_hex(8));
                     //panic!("correctly decoded")
                   },
@@ -481,5 +616,56 @@ mod tests {
       }
     }
   }
+*/
+  #[test]
+  fn decode_lzw_test2() {
+    let d = include_bytes!("../assets/test.gif");
+    let data = &d[13..];
+    //println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
+    // we know the color table size
+    match color_table(data, 256) {
+      IResult::Done(i, colors) => {
+        println!("parsed: {:?}", colors);
+        // allocate the image
+        let mut buffer: Vec<u8> = Vec::with_capacity(2 * 2 * 3);
+        unsafe { buffer.set_len(2 * 2 * 3); }
+
+        let data = &d[801..];
+        //println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
+
+        match graphic_block(data) {
+          IResult::Done(i, Block::GraphicBlock(opt_control, rendering)) => {
+            //let (opt_control, rendering) = grb;
+            println!("control: {:?}", opt_control);
+            println!("rendering: {:?}", rendering);
+            match rendering {
+              GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
+                println!("descriptor: {:?}", descriptor);
+                match lzw::decode_lzw(colors, code_size as usize, blocks, &mut buffer[..]) {
+                  Ok(nb) => {
+                    println!("decoded the image({} bytes):\n{}", nb, buffer.to_hex(8));
+                    panic!("correctly decoded")
+                  },
+                  _ => panic!("could not decode")
+                }
+              },
+              _ => {
+                panic!("plaintext extension");
+              }
+            }
+          },
+          e  => {
+            println!("error or incomplete: {:?}", e);
+            panic!("cannot parse graphic block");
+          }
+
+        }
+      },
+      e  => {
+        println!("error or incomplete: {:?}", e);
+        panic!("cannot parse global color table");
+      }
+    }
+  }
 }

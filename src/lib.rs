@@ -1,4 +1,4 @@
-#![feature(core,collections,trace_macros)]
+#![feature(core,collections,trace_macros,old_io)]
 
 #[macro_use]
 extern crate nom;

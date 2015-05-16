@@ -136,6 +136,7 @@ pub fn buf_to_colors(buffer: &[u8], row_size: usize) -> Vec< Vec<(u8,u8,u8)> > {
 
 pub fn decode_gif () -> Vec< Vec<(u8,u8,u8)> > {
   let d = include_bytes!("../../assets/axolotl-piano.gif");
+  //let d = include_bytes!("../../assets/test.gif");
   let data = &d[13..];
   println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
@@ -156,7 +157,7 @@ pub fn decode_gif () -> Vec< Vec<(u8,u8,u8)> > {
           match rendering {
             GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
               match lzw::decode_lzw(colors, code_size as usize, blocks, &mut buffer[..]) {
-                Some(nb) => {
+                Ok(nb) => {
                   println!("decoded the image({} bytes):\n", nb);//, buffer.to_hex(8));
                   return buf_to_colors(&mut buffer[..], 400);
                   //panic!("correctly decoded")
