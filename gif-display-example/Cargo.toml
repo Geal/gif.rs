@@ -10,10 +10,10 @@ nom     = "~0.2.0"
 path = ".."
 version = "*"
 
-[dependencies.glium_graphics]
-#git = "https://github.com/PistonDevelopers/glium_graphics"
-git = "https://github.com/Geal/glium_graphics"
-branch = "update-graphics"
+[dependencies.piston2d-glium_graphics]
+git = "https://github.com/PistonDevelopers/glium_graphics"
+#git = "https://github.com/Geal/glium_graphics"
+#branch = "update-graphics"
 
 [dependencies.freetype-rs]
 git = "https://github.com/PistonDevelopers/freetype-rs"
@@ -27,9 +27,15 @@ git = "https://github.com/PistonDevelopers/shader_version"
 [dependencies.glium]
 features = ["image", "gl_read_buffer"]
 default_features = true
-git = "https://github.com/tomaka/glium"
+#git = "https://github.com/tomaka/glium"
 
 [dependencies.glutin]
 
 [dependencies.image]
 version = "0.3.1"
+
+[dependencies.pistoncore-sdl2_window]
+git = "https://github.com/PistonDevelopers/sdl2_window"
+
+[dependencies.piston]
+git = "https://github.com/PistonDevelopers/piston"

@@ -5,6 +5,8 @@ extern crate glium;
 extern crate glutin;
 extern crate glium_graphics;
 extern crate image;
+extern crate sdl2_window;
+extern crate piston;
 
 extern crate gif;
 extern crate nom;
@@ -15,30 +17,40 @@ use gif::*;
 use gif::parser::*;
 use gif::lzw::*;
 
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::path::Path;
 use std::thread::sleep;
-use std::time::duration::Duration;
 use glium::{ DisplayBuild, Surface, Texture2d };
-use glium_graphics::{ Glium2d, GliumGraphics, DrawTexture, OpenGL };
+use glium_graphics::{ Glium2d, GliumGraphics, DrawTexture, GliumWindow };
+use sdl2_window::{ Sdl2Window, OpenGL };
+use piston::event::*;
+use piston::window::{ WindowSettings, Size };
 
 fn main() {
     println!("starting...");
-    let builder = glutin::WindowBuilder::new();
-    let window = builder
-        .with_dimensions(400, 300)
-        .with_title("glium_graphics: image_test".to_string())
-        .build_glium().unwrap();
-
+    let opengl = OpenGL::_3_2;
+    let (w, h) = (400, 300);
+    let ref window = Rc::new(RefCell::new(
+        Sdl2Window::new(
+            opengl,
+            WindowSettings::new(
+                "glium_graphics: image_test".to_string(),
+                Size { width: w, height: h }
+            ).exit_on_esc(true)
+        )
+    ));
+    let ref glium_window = GliumWindow::new(window).unwrap();
 
     println!("A");
     let rust_logo = DrawTexture::new({
         let image = image::open(&Path::new("../assets/rust.png")).unwrap();
-        Texture2d::new(&window, image)
+        Texture2d::new(glium_window, image)
     });
 
     println!("B");
     let pixels = DrawTexture::new({
-        Texture2d::new(&window, decode_gif())
+        Texture2d::new(glium_window, decode_gif())
     });
     /*let pixels = DrawTexture::new({
         Texture2d::new(&window,
@@ -76,14 +88,15 @@ fn main() {
     });*/
 
     println!("C");
-    let mut g2d = Glium2d::new(OpenGL::_3_2, &window);
-    let (w, h) = window.get_framebuffer_dimensions();
+    let mut g2d = Glium2d::new(OpenGL::_3_2, glium_window);
     println!("w: {:?}, h: {:?}", w, h);
-    let transform = graphics::abs_transform(w as f64, h as f64);
+    let transform = graphics::math::abs_transform(w as f64, h as f64);
     println!("f: w: {:?}, h: {:?}", w as f64, h as f64);
 
-    loop {
-        let mut target = window.draw();
+ 
+    for e in window.events().swap_buffers(false) {
+      if let Some(_) = e.render_args() {
+        let mut target = glium_window.draw();
         {
             use graphics::*;
 
@@ -106,12 +119,7 @@ fn main() {
 
         }
         target.finish();
-
-        window.poll_events().last();
-        if window.is_closed() {
-            break
-        }
-        sleep(Duration::milliseconds(15));
+      }
     }
 }
 
