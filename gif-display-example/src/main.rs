@@ -48,7 +48,12 @@ fn main() {
 
     println!("B");
     let pixels = DrawTexture::new({
-        Texture2d::new(glium_window, decode_gif())
+        let decoded = decode_gif();
+        let mut reversed:Vec< Vec<(u8,u8,u8)> > = Vec::new();
+        for el in decoded.iter().rev() {
+          reversed.push(el.clone());
+        }
+        Texture2d::new(glium_window, reversed)
     });
     /*let pixels = DrawTexture::new({
         Texture2d::new(&window,
