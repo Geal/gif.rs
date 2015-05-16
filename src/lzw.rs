@@ -1,4 +1,3 @@
-use nom::util::*;
 use std::io;
 use std::io::Read;
 use std::io::ErrorKind::InvalidInput;
@@ -152,7 +151,7 @@ impl DecodingDict {
 pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8]>, buffer: &mut [u8]) -> io::Result<usize> {
 
   println!("buffer size: {}", buffer.len());
-  let mut data = subblocks_to_buffer(blocks);
+  let data = subblocks_to_buffer(blocks);
   let mut r = LsbReader::new(&data[..]);
 
   let mut prev = None;
@@ -204,7 +203,6 @@ pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8
       prev = Some(code as u16);
     }
   }
-  Ok(0)
 }
 
 pub fn translate_color(colors: &[Vec<u8>], code: u16) -> Vec<u8> {

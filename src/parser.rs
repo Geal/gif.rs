@@ -1,7 +1,5 @@
-#![feature(core,collections,trace_macros)]
-
 use nom::{HexDisplay,Needed,IResult,be_u8,le_u8,le_u16,length_value};
-use nom::{Consumer,Err};
+use nomErr;
 use nom::IResult::*;
 use std::str::from_utf8;
 
