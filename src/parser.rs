@@ -1,5 +1,5 @@
 use nom::{HexDisplay,Needed,IResult,be_u8,le_u8,le_u16,length_value};
-use nomErr;
+use nom::Err;
 use nom::IResult::*;
 use std::str::from_utf8;
 
