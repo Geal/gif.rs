@@ -1,5 +1,3 @@
-#![feature(std_misc, thread_sleep)]
-
 extern crate graphics;
 extern crate glium;
 extern crate glutin;
@@ -20,8 +18,8 @@ use gif::lzw::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::path::Path;
-use std::thread::sleep;
-use glium::{ DisplayBuild, Surface, Texture2d };
+use std::vec::Vec;
+use glium::{ Surface, Texture2d };
 use glium_graphics::{ Glium2d, GliumGraphics, DrawTexture, GliumWindow };
 use sdl2_window::{ Sdl2Window, OpenGL };
 use piston::event::*;
@@ -150,7 +148,7 @@ pub fn decode_gif () -> Vec< Vec<(u8,u8,u8)> > {
 
   // we know the color table size
   match color_table(data, 256) {
-    IResult::Done(i, colors) => {
+    IResult::Done(_, colors) => {
       //println!("parsed: {:?}", colors);
       // allocate the image
       let mut buffer: Vec<u8> = Vec::with_capacity(400 * 300 * 3);
@@ -160,7 +158,7 @@ pub fn decode_gif () -> Vec< Vec<(u8,u8,u8)> > {
       //println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
       match graphic_block(data) {
-        IResult::Done(i, Block::GraphicBlock(opt_control, rendering)) => {
+        IResult::Done(_, Block::GraphicBlock(opt_control, rendering)) => {
           //let (opt_control, rendering) = grb;
           match rendering {
             GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
