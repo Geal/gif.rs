@@ -1,9 +1,9 @@
 use nom::util::*;
-use std::num::Int;
 use std::io;
-use std::old_io::{Reader,MemReader,IoResult,IoError};
-use std::old_io::IoErrorKind::InvalidInput;
+use std::io::Read;
+use std::io::ErrorKind::InvalidInput;
 use std::slice::bytes::copy_memory;
+use byteorder::ReadBytesExt;
 
 fn subblocks_to_buffer(blocks: Vec<&[u8]>) -> Vec<u8> {
   let mut data: Vec<u8> = Vec::new();
@@ -13,18 +13,18 @@ fn subblocks_to_buffer(blocks: Vec<&[u8]>) -> Vec<u8> {
   data
 }
 
-pub trait BitReader: Reader {
+pub trait BitReader: Read {
   /// Returns the next `n` bits.
-  fn read_bits(&mut self, n: u8) -> IoResult<u16>;
+  fn read_bits(&mut self, n: u8) -> io::Result<u16>;
 }
 
-pub struct LsbReader<R> where R: Reader {
+pub struct LsbReader<R> where R: Read {
   r: R,
   bits: u8,
   acc: u32,
 }
 
-impl<R: Reader> LsbReader<R> {
+impl<R: Read> LsbReader<R> {
 
   /// Creates a new bit reader
   pub fn new(reader: R) -> LsbReader<R> {
@@ -42,8 +42,8 @@ impl<R: Reader> LsbReader<R> {
   }
 }
 
-impl<R: Reader> Reader for LsbReader<R> {
-  fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+impl<R: Read> Read for LsbReader<R> {
+  fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
     if self.is_aligned() {
       self.r.read(buf)
     } else {
@@ -57,15 +57,11 @@ impl<R: Reader> Reader for LsbReader<R> {
   }
 }
 
-impl<R> BitReader for LsbReader<R> where R: Reader {
+impl<R> BitReader for LsbReader<R> where R: Read {
 
-  fn read_bits(&mut self, n: u8) -> IoResult<u16> {
+  fn read_bits(&mut self, n: u8) -> io::Result<u16> {
     if n > 16 {
-      return Err(IoError {
-        kind: InvalidInput,
-        desc: "Cannot read more than 16 bits",
-        detail: None
-      })
+      return Err(io::Error::new(InvalidInput, "Cannot read more than 16 bits"))
     }
     while self.bits < n {
       self.acc |= (try!(self.r.read_u8()) as u32) << self.bits;
@@ -113,7 +109,7 @@ impl DecodingDict {
     }
 
     /// Reconstructs the data for the corresponding code
-    fn reconstruct(&mut self, code: Option<Code>) -> IoResult<&[u8]> {
+    fn reconstruct(&mut self, code: Option<Code>) -> io::Result<&[u8]> {
         self.buffer.clear();
         let mut code = code;
         let mut cha;
@@ -125,11 +121,7 @@ impl DecodingDict {
                     code = code_;
                     cha = cha_;
                 }
-                None => return Err(IoError {
-                    kind: InvalidInput,
-                    desc: "invalid code occured",
-                    detail: Some(format!("{} < {} expected", k, self.table.len()))
-                })
+                None => return Err(io::Error::new(InvalidInput, "invalid code occured"))
             }
             self.buffer.push(cha);
         }
@@ -157,11 +149,11 @@ impl DecodingDict {
     }
 }
 
-pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8]>, buffer: &mut [u8]) -> IoResult<usize> {
+pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8]>, buffer: &mut [u8]) -> io::Result<usize> {
 
   println!("buffer size: {}", buffer.len());
   let mut data = subblocks_to_buffer(blocks);
-  let mut r = LsbReader::new(MemReader::new(data));
+  let mut r = LsbReader::new(&data[..]);
 
   let mut prev = None;
   println!("min code size: {}", min_code_size);
@@ -185,7 +177,6 @@ pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8
     } else {
       let next_code = table.next_code();
       if prev.is_none() {
-        //try!(w.write_u8(code as u8));
         let cols = translate_color(&colors, code);
         copy_memory(&cols[..], &mut buffer[count..]);
         count = count + cols.len();
@@ -200,18 +191,9 @@ pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8
           table.buffer()
         } else {
           println!("invalid code, expected {} <= {}", code, next_code);
-          return Err(IoError {
-            kind: InvalidInput,
-            desc: "Invalid code",
-            detail: Some(format!("expected {} <= {}",
-                                 code,
-                                 next_code)
-                        )
-          })
+          return Err(io::Error::new(InvalidInput, "Invalid code"))
         };
-        //try!(w.write(data));
         let cols = translate_colors(&colors, data);
-        //println!("will copy {:?} at address {} of buffer of size {}", &cols[..], count, buffer.len());
         copy_memory(&cols[..], &mut buffer[count..]);
         count = count + cols.len();
       }
@@ -223,15 +205,6 @@ pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8
     }
   }
   Ok(0)
-  /*let mut index = 0;
-  for b in blocks.iter() {
-    let mut dictionary = colors.clone();
-    match decode_block(dictionary, code_size, b, &mut buffer[index..]) {
-      Some(count) => index = index + count,
-      None        => return None
-    }
-  }
-  Some(index)*/
 }
 
 pub fn translate_color(colors: &[Vec<u8>], code: u16) -> Vec<u8> {
@@ -247,74 +220,3 @@ pub fn translate_colors(colors: &[Vec<u8>], codes: &[u8]) -> Vec<u8> {
   }
   res
 }
-/*
-pub fn decode_block(mut colors: Vec< Vec<u8> >, code_size: usize, block: &[u8], buffer: &mut [u8]) -> Option<usize> {
-    println!("will decode block:\n{}", block.to_hex(8));
-    //println!("will decode block");
-    let mut dictionary: Vec< Vec<u16> > = Vec::new();
-    let clear_code = 2.pow(1 + code_size as u32);
-    let stop_code = clear_code + 1;
-    println!("clear code '{}' and stop code '{}'", clear_code, stop_code);
-    let end = 2.pow(code_size as u32);
-    for i in 0..end {
-    //for i in 0..100 {
-      let mut v: Vec<u16> = Vec::new();
-      v.push(i);
-      //println!("adding {:?}", v);
-      dictionary.push(v);
-    }
-    let mut count = 0;
-    let mut old   = 0;
-    for idx in 0..block.len() {
-      println!("c: {}", block[idx]);
-      let code = block[idx] as usize;
-      if code == clear_code {
-        println!("found clear code {} at {}", clear_code, count);
-      } else if code == stop_code {
-        println!("found stop  code {} at {}", stop_code,  count);
-      }
-      if idx == 0 {
-        old = code;
-        //println!("will copy {:?} in {} bytes", &dictionary[code], (&buffer[count..]).len());
-        //FIXME: https://github.com/rust-lang/rust/issues/22890 reordered the arguments
-        let cols = translate_colors(&colors, &dictionary[code][..]);
-        println!("will copy {:?} at address {} of buffer of size {}", &cols[..], count, buffer.len());
-        copy_memory(&cols[..], buffer);
-        //copy_memory(code, buffer);
-        //count = count + dictionary[code].len();
-        count = count + cols.len();
-      } else {
-        if code <= dictionary.len() {
-          let cols = translate_colors(&colors, &dictionary[code][..]);
-          println!("will copy {:?} at address {} of buffer of size {}", &cols[..], count, buffer.len());
-          copy_memory(&cols[..], &mut buffer[count..]);
-          let k = dictionary[code][0];
-          let mut v: Vec<u16> = Vec::new();
-          v.push_all(&dictionary[old]);
-          v.push(k);
-          dictionary.push(v);
-
-          //println!("c: {} => {:?}", block[idx], dictionary[code as usize]);
-          //count = count + dictionary[code].len();
-          count = count + cols.len();
-        } else {
-          let k = dictionary[old][0];
-          let mut v: Vec<u16> = Vec::new();
-          v.push_all(&dictionary[old]);
-          v.push(k);
-          let cols = translate_colors(&colors, &v);
-          println!("will copy {:?} at address {} of buffer of size {}", &cols[..], count, buffer.len());
-          copy_memory(&cols[..], &mut buffer[count..]);
-          dictionary.push(v.clone());
-
-          //println!("c: {} => {:?}", block[idx], v);
-          //count = count + v.len();
-          count = count + cols.len();
-        }
-        let old = code;
-      }
-    }
-
-  Some(count)
-}
-*/

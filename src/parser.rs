@@ -1,9 +1,8 @@
 #![feature(core,collections,trace_macros)]
 
 use nom::{HexDisplay,Needed,IResult,be_u8,le_u8,le_u16,length_value};
-use nom::{Consumer};
+use nom::{Consumer,Err};
 use nom::IResult::*;
-use std::num::Int;
 use std::str::from_utf8;
 
 #[derive(Debug,PartialEq,Eq)]
@@ -46,7 +45,7 @@ pub fn logical_screen_descriptor(input:&[u8]) -> IResult<&[u8], LogicalScreenDes
        gct_flag:               fields & 0b10000000 == 0b10000000,
        color_resolution:       (fields & 0b01110000) >> 4,
        gct_sorted:             fields & 0b00001000 == 0b00001000,
-       gct_size:               2.pow((1 + (fields & 0b00000111)) as u32),
+       gct_size:               2u16.pow((1 + (fields & 0b00000111)) as u32),
        background_color_index: index,
        pixel_aspect_ratio:     ratio
      }
@@ -198,7 +197,7 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
               v
             }
           ),
-          2.pow((1 + (fields & 0b00000111)) as u32)
+          2u16.pow((1 + (fields & 0b00000111)) as u32)
         )
       ),
     || {
@@ -210,7 +209,7 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
         local_color_table_flag: fields & 0b10000000 == 0b10000000,
         interlace:              fields & 0b01000000 == 0b01000000,
         sort:                   fields & 0b00100000 == 0b00100000,
-        local_color_table_size: 2.pow((1 + (fields & 0b00000111)) as u32),
+        local_color_table_size: 2u32.pow((1 + (fields & 0b00000111)) as u32),
         local_color_table:      color_table
       }
     }
@@ -221,7 +220,7 @@ pub fn not_null(input: &[u8]) -> IResult<&[u8], u8> {
   if input.len() == 0 {
     IResult::Incomplete(Needed::Size(1))
   } else if input[0] == 0 {
-    IResult::Error(0)
+    IResult::Error(Err::Code(0))
   } else {
     IResult::Done(&input[1..], input[0])
   }
@@ -230,11 +229,11 @@ pub fn not_null(input: &[u8]) -> IResult<&[u8], u8> {
 pub fn not_null_length_value(input:&[u8]) -> IResult<&[u8], &[u8]> {
   let input_len = input.len();
   if input_len == 0 {
-    return IResult::Error(0)
+    return IResult::Error(Err::Code(0))
   }
   if input[0] == 0 {
     println!("found empty sub block");
-    return IResult::Error(0)
+    return IResult::Error(Err::Code(0))
     //return IResult::Done(&input[1..], b"")
   }
 
@@ -547,7 +546,7 @@ mod tests {
     }
   }
 
-  /*#[test]
+  #[test]
   fn multiple_blocks_test() {
     let d = include_bytes!("../assets/axolotl-piano.gif");
     let data = &d[781..];
@@ -566,8 +565,8 @@ mod tests {
         panic!("cannot parse global color table");
       }
     }
-  }*/
-/*
+  }
+
   #[test]
   fn decode_lzw_test() {
     let d = include_bytes!("../assets/axolotl-piano.gif");
@@ -616,7 +615,7 @@ mod tests {
       }
     }
   }
-*/
+
   #[test]
   fn decode_lzw_test2() {
     let d = include_bytes!("../assets/test.gif");
@@ -645,7 +644,7 @@ mod tests {
                 match lzw::decode_lzw(colors, code_size as usize, blocks, &mut buffer[..]) {
                   Ok(nb) => {
                     println!("decoded the image({} bytes):\n{}", nb, buffer.to_hex(8));
-                    panic!("correctly decoded")
+                    //panic!("correctly decoded")
                   },
                   _ => panic!("could not decode")
                 }

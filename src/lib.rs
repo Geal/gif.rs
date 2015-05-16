@@ -1,7 +1,9 @@
-#![feature(core,collections,trace_macros,old_io)]
+#![feature(core,collections,trace_macros)]
 
 #[macro_use]
 extern crate nom;
+
+extern crate byteorder;
 
 pub mod lzw;
 pub mod parser;
