@@ -1,0 +1,18 @@
+[package]
+name = "gif-display-example"
+version = "0.0.1"
+authors = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]
+
+[dependencies]
+nom     = "~0.3.0"
+
+[dependencies.gif]
+path = ".."
+version = "*"
+
+[dependencies.afl-coverage-plugin]
+git = "https://github.com/kmcallister/afl.rs"
+
+[dependencies.afl-coverage]
+git = "https://github.com/kmcallister/afl.rs"
+
