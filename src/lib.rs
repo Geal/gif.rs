@@ -9,7 +9,7 @@ pub mod lzw;
 pub mod parser;
 
 use nom::IResult::*;
-use nom::util::HexDisplay;
+use nom::HexDisplay;
 
 enum State {
   Header,

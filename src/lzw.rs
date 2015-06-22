@@ -150,21 +150,21 @@ impl DecodingDict {
 
 pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8]>, buffer: &mut [u8]) -> io::Result<usize> {
 
-  println!("buffer size: {}", buffer.len());
+  //println!("buffer size: {}", buffer.len());
   let data = subblocks_to_buffer(blocks);
   let mut r = LsbReader::new(&data[..]);
 
   let mut prev = None;
-  println!("min code size: {}", min_code_size);
+  //println!("min code size: {}", min_code_size);
   let clear_code: u16 = 1 << min_code_size;
   let end_code = clear_code + 1;
   let mut table = DecodingDict::new(min_code_size as u8);
   let mut code_size:u8 = min_code_size as u8 + 1;
   let mut count:usize = 0;
-  println!("start decoding");
+  //println!("start decoding");
   loop {
     let code = try!(r.read_bits(code_size));
-    println!("{}| current code: {}", count, code);
+    //println!("{}| current code: {}", count, code);
     if code as u16 == clear_code {
       table.reset();
       table.push(None, 0); // clear code

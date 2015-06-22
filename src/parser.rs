@@ -84,7 +84,7 @@ pub fn color_table(input:&[u8], count: u16) -> IResult<&[u8], GlobalColorTable> 
         v
       }
     ),
-    count
+    count as usize
   )
 }
 
@@ -195,7 +195,7 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
               v
             }
           ),
-          2u16.pow((1 + (fields & 0b00000111)) as u32)
+          2u16.pow((1u16 + (fields as u16 & 0b00000111)) as u32) as usize
         )
       ),
     || {
@@ -207,7 +207,7 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
         local_color_table_flag: fields & 0b10000000 == 0b10000000,
         interlace:              fields & 0b01000000 == 0b01000000,
         sort:                   fields & 0b00100000 == 0b00100000,
-        local_color_table_size: 2u32.pow((1 + (fields & 0b00000111)) as u32),
+        local_color_table_size: 2u32.pow((1 + (fields as u16 & 0b00000111)) as u32),
         local_color_table:      color_table
       }
     }
@@ -230,18 +230,18 @@ pub fn not_null_length_value(input:&[u8]) -> IResult<&[u8], &[u8]> {
     return IResult::Error(Err::Code(0))
   }
   if input[0] == 0 {
-    println!("found empty sub block");
+    //println!("found empty sub block");
     return IResult::Error(Err::Code(0))
     //return IResult::Done(&input[1..], b"")
   }
 
   let len = input[0] as usize;
   if input_len - 1 >= len {
-    println!("found {} length in:\n{}", len, (&input[0..len+1]).to_hex(8));
-    println!("remaining:\n{}", (&input[len+1..len+20]).to_hex(8));
+    //println!("found {} length in:\n{}", len, (&input[0..len+1]).to_hex(8));
+    //println!("remaining:\n{}", (&input[len+1..len+20]).to_hex(8));
     return IResult::Done(&input[len+1..], &input[1..len+1])
   } else {
-    return IResult::Incomplete(Needed::Size(1+len as u32))
+    return IResult::Incomplete(Needed::Size(1+len as usize))
   }
 }
 
@@ -269,7 +269,7 @@ named!(graphic_rendering_block<&[u8], GraphicRenderingBlock>,
 );
 
 pub fn graphic_block(input:&[u8]) -> IResult<&[u8], Block> {
-  println!("data for graphic block:\n{}", &input[..100].to_hex(8));
+  //println!("data for graphic block:\n{}", &input[..100].to_hex(8));
   chain!(input,
     control:   graphic_control ?       ~
     rendering: graphic_rendering_block ,
