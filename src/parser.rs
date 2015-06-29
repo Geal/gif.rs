@@ -269,7 +269,7 @@ named!(graphic_rendering_block<&[u8], GraphicRenderingBlock>,
 );
 
 pub fn graphic_block(input:&[u8]) -> IResult<&[u8], Block> {
-  //println!("data for graphic block:\n{}", &input[..100].to_hex(8));
+  println!("data for graphic block:\n{}", &input[..100].to_hex(8));
   chain!(input,
     control:   graphic_control ?       ~
     rendering: graphic_rendering_block ,
