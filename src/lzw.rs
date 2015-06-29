@@ -156,51 +156,55 @@ pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8
 
   let mut prev = None;
   //println!("min code size: {}", min_code_size);
-  let clear_code: u16 = 1 << min_code_size;
-  let end_code = clear_code + 1;
-  let mut table = DecodingDict::new(min_code_size as u8);
-  let mut code_size:u8 = min_code_size as u8 + 1;
-  let mut count:usize = 0;
-  //println!("start decoding");
-  loop {
-    let code = try!(r.read_bits(code_size));
-    //println!("{}| current code: {}", count, code);
-    if code as u16 == clear_code {
-      table.reset();
-      table.push(None, 0); // clear code
-      table.push(None, 0); // end code
-      code_size = min_code_size as u8 + 1;
-      prev = None;
-    } else if code as u16 == end_code {
-      return Ok(count)
-    } else {
-      let next_code = table.next_code();
-      if prev.is_none() {
-        let cols = translate_color(&colors, code);
-        copy_memory(&cols[..], &mut buffer[count..]);
-        count = count + cols.len();
+  if min_code_size > 15 {
+    Err(io::Error::new(io::ErrorKind::InvalidInput, "minimal code size is too large"))
+  } else {
+    let clear_code: u16 = 1 << min_code_size;
+    let end_code = clear_code + 1;
+    let mut table = DecodingDict::new(min_code_size as u8);
+    let mut code_size:u8 = min_code_size as u8 + 1;
+    let mut count:usize = 0;
+    //println!("start decoding");
+    loop {
+      let code = try!(r.read_bits(code_size));
+      //println!("{}| current code: {}", count, code);
+      if code as u16 == clear_code {
+        table.reset();
+        table.push(None, 0); // clear code
+        table.push(None, 0); // end code
+        code_size = min_code_size as u8 + 1;
+        prev = None;
+      } else if code as u16 == end_code {
+        return Ok(count)
       } else {
-        let data = if (code as u16) == next_code {
-          let cha = try!(table.reconstruct(prev))[0];
-          table.push(prev, cha);
-          try!(table.reconstruct(Some(code as u16)))
-        } else if (code as u16) < next_code {
-          let cha = try!(table.reconstruct(Some(code as u16)))[0];
-          table.push(prev, cha);
-          table.buffer()
+        let next_code = table.next_code();
+        if prev.is_none() {
+          let cols = translate_color(&colors, code);
+          copy_memory(&cols[..], &mut buffer[count..]);
+          count = count + cols.len();
         } else {
-          println!("invalid code, expected {} <= {}", code, next_code);
-          return Err(io::Error::new(InvalidInput, "Invalid code"))
-        };
-        let cols = translate_colors(&colors, data);
-        copy_memory(&cols[..], &mut buffer[count..]);
-        count = count + cols.len();
-      }
-      if next_code == (1 << code_size as usize) - 1
-        && code_size < MAX_CODESIZE as u8 {
-          code_size += 1;
+          let data = if (code as u16) == next_code {
+            let cha = try!(table.reconstruct(prev))[0];
+            table.push(prev, cha);
+            try!(table.reconstruct(Some(code as u16)))
+          } else if (code as u16) < next_code {
+            let cha = try!(table.reconstruct(Some(code as u16)))[0];
+            table.push(prev, cha);
+            table.buffer()
+          } else {
+            println!("invalid code, expected {} <= {}", code, next_code);
+            return Err(io::Error::new(InvalidInput, "Invalid code"))
+          };
+          let cols = translate_colors(&colors, data);
+          copy_memory(&cols[..], &mut buffer[count..]);
+          count = count + cols.len();
         }
-      prev = Some(code as u16);
+        if next_code == (1 << code_size as usize) - 1
+          && code_size < MAX_CODESIZE as u8 {
+            code_size += 1;
+          }
+        prev = Some(code as u16);
+      }
     }
   }
 }
