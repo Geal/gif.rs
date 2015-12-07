@@ -4,38 +4,10 @@ version = "0.0.1"
 authors = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]
 
 [dependencies]
-nom     = "~0.3.0"
+glium = "~0.12"
+nom     = "~0.3"
 
 [dependencies.gif]
 path = ".."
 version = "*"
 
-[dependencies.piston2d-glium_graphics]
-git = "https://github.com/PistonDevelopers/glium_graphics"
-#git = "https://github.com/Geal/glium_graphics"
-#branch = "update-graphics"
-
-[dependencies.freetype-rs]
-git = "https://github.com/PistonDevelopers/freetype-rs"
-
-[dependencies.piston2d-graphics]
-git = "https://github.com/PistonDevelopers/graphics"
-
-[dependencies.shader_version]
-git = "https://github.com/PistonDevelopers/shader_version"
-
-[dependencies.glium]
-features = ["image", "gl_read_buffer"]
-default_features = true
-#git = "https://github.com/tomaka/glium"
-
-[dependencies.glutin]
-
-[dependencies.image]
-version = "0.3.1"
-
-[dependencies.pistoncore-sdl2_window]
-git = "https://github.com/PistonDevelopers/sdl2_window"
-
-[dependencies.piston]
-git = "https://github.com/PistonDevelopers/piston"
