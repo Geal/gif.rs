@@ -1,7 +1,7 @@
 #![feature(plugin)]
-#![plugin(afl_coverage_plugin)]
+#![plugin(afl_plugin)]
 
-extern crate afl_coverage;
+extern crate afl;
 
 extern crate gif;
 extern crate nom;
