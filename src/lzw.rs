@@ -148,7 +148,7 @@ impl DecodingDict {
     }
 }
 
-pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8]>, buffer: &mut [u8]) -> io::Result<usize> {
+pub fn decode_lzw(colors: &[Vec<u8>], min_code_size: usize, blocks: Vec<&[u8]>, buffer: &mut [u8]) -> io::Result<usize> {
 
   //println!("buffer size: {}", buffer.len());
   let data = subblocks_to_buffer(blocks);

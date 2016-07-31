@@ -124,7 +124,7 @@ pub fn decode_gif () -> Vec< Vec<(u8,u8,u8)> > {
           //let (opt_control, rendering) = grb;
           match rendering {
             GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
-              match lzw::decode_lzw(colors, code_size as usize, blocks, &mut buffer[..]) {
+              match lzw::decode_lzw(&colors, code_size as usize, blocks, &mut buffer[..]) {
                 Ok(nb) => {
                   println!("decoded the image({} bytes):\n", nb);//, buffer.to_hex(8));
                   return buf_to_colors(&mut buffer[..], 400);

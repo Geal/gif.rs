@@ -592,7 +592,7 @@ mod tests {
             //let (opt_control, rendering) = grb;
             match rendering {
               GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
-                match lzw::decode_lzw(colors, code_size as usize, blocks, &mut buffer[..]) {
+                match lzw::decode_lzw(&colors, code_size as usize, blocks, &mut buffer[..]) {
                   Ok(nb) => {
                     println!("decoded the image({} bytes):\n{}", nb, buffer.to_hex(8));
                     //panic!("correctly decoded")
@@ -644,7 +644,7 @@ mod tests {
             match rendering {
               GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
                 println!("descriptor: {:?}", descriptor);
-                match lzw::decode_lzw(colors, code_size as usize, blocks, &mut buffer[..]) {
+                match lzw::decode_lzw(&colors, code_size as usize, blocks, &mut buffer[..]) {
                   Ok(nb) => {
                     println!("decoded the image({} bytes):\n{}", nb, buffer.to_hex(8));
                     //panic!("correctly decoded")
