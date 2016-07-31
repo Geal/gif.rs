@@ -1,13 +1,13 @@
 use std::io;
-use std::io::Read;
+use std::io::{Read,Write};
 use std::io::ErrorKind::InvalidInput;
-use std::slice::bytes::copy_memory;
+use std::ptr;
 use byteorder::ReadBytesExt;
 
 fn subblocks_to_buffer(blocks: Vec<&[u8]>) -> Vec<u8> {
   let mut data: Vec<u8> = Vec::new();
   for b in blocks.iter() {
-    data.push_all(b);
+    data.extend(b.iter());
   }
   data
 }
@@ -180,7 +180,7 @@ pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8
         let next_code = table.next_code();
         if prev.is_none() {
           let cols = translate_color(&colors, code);
-          copy_memory(&cols[..], &mut buffer[count..]);
+          try!((&mut buffer[count..]).write_all(&cols[..]));
           count = count + cols.len();
         } else {
           let data = if (code as u16) == next_code {
@@ -196,7 +196,7 @@ pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8
             return Err(io::Error::new(InvalidInput, "Invalid code"))
           };
           let cols = translate_colors(&colors, data);
-          copy_memory(&cols[..], &mut buffer[count..]);
+          try!((&mut buffer[count..]).write_all(&cols[..]));
           count = count + cols.len();
         }
         if next_code == (1 << code_size as usize) - 1
@@ -211,14 +211,14 @@ pub fn decode_lzw(colors: Vec< Vec<u8> >, min_code_size: usize, blocks: Vec<&[u8
 
 pub fn translate_color(colors: &[Vec<u8>], code: u16) -> Vec<u8> {
   let mut res:Vec<u8> = Vec::with_capacity(3);
-  res.push_all(&colors[code as usize][..]);
+  res.extend((&colors[code as usize][..]).iter());
   res
 }
 
 pub fn translate_colors(colors: &[Vec<u8>], codes: &[u8]) -> Vec<u8> {
   let mut res:Vec<u8> = Vec::with_capacity(codes.len() * 3);
   for &code in codes.iter() {
-    res.push_all(&colors[code as usize][..])
+    res.extend((&colors[code as usize][..]).iter());
   }
   res
 }
