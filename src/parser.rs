@@ -1,4 +1,4 @@
-use nom::{HexDisplay,Needed,IResult,be_u8,le_u8,le_u16,length_value};
+use nom::{HexDisplay,Needed,IResult,ErrorKind,be_u8,le_u8,le_u16,length_value};
 use nom::Err;
 use nom::IResult::*;
 use std::str::from_utf8;
@@ -19,8 +19,8 @@ pub fn header(input:&[u8]) -> IResult<&[u8], Gif> {
 
 #[derive(Debug,PartialEq,Eq)]
 pub struct LogicalScreenDescriptor {
-  pub  width:                  u16,
-  pub  height:                 u16,
+  pub  width:             u16,
+  pub  height:            u16,
   gct_flag:               bool,
   color_resolution:       u8,
   gct_sorted:             bool,
@@ -169,6 +169,26 @@ named!(graphic_control<&[u8], GraphicControl>,
   )
 );
 
+named!(color<&[u8], Vec<u8> >,
+  chain!(
+    r: be_u8 ~
+    g: be_u8 ~
+    b: be_u8 ,
+    || {
+      //Color { r: r, g: g, b: b }
+      let mut v: Vec<u8> = Vec::new();
+      v.push(r);
+      v.push(g);
+      v.push(b);
+      v
+    }
+  )
+);
+
+fn count_color(input: &[u8], size: usize) -> IResult<&[u8], Vec<Vec<u8>>, u32> {
+  count!(input, color, size)
+}
+
 named!(image_descriptor<&[u8], ImageDescriptor>,
 
   chain!(
@@ -181,22 +201,7 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
     color_table:
       cond!(
         fields & 0b10000000 == 0b10000000,
-        count!(
-          chain!(
-            r: be_u8 ~
-            g: be_u8 ~
-            b: be_u8 ,
-            || {
-              //Color { r: r, g: g, b: b }
-              let mut v: Vec<u8> = Vec::new();
-              v.push(r);
-              v.push(g);
-              v.push(b);
-              v
-            }
-          ),
-          2u16.pow((1u16 + (fields as u16 & 0b00000111)) as u32) as usize
-        )
+        call!(count_color, 2u16.pow((1u16 + (fields as u16 & 0b00000111)) as u32) as usize)
       ),
     || {
       ImageDescriptor{
@@ -218,7 +223,7 @@ pub fn not_null(input: &[u8]) -> IResult<&[u8], u8> {
   if input.len() == 0 {
     IResult::Incomplete(Needed::Size(1))
   } else if input[0] == 0 {
-    IResult::Error(Err::Code(0))
+    IResult::Error(Err::Code(ErrorKind::Custom(0)))
   } else {
     IResult::Done(&input[1..], input[0])
   }
@@ -227,11 +232,11 @@ pub fn not_null(input: &[u8]) -> IResult<&[u8], u8> {
 pub fn not_null_length_value(input:&[u8]) -> IResult<&[u8], &[u8]> {
   let input_len = input.len();
   if input_len == 0 {
-    return IResult::Error(Err::Code(0))
+    return IResult::Error(Err::Code(ErrorKind::Custom(0)))
   }
   if input[0] == 0 {
     //println!("found empty sub block");
-    return IResult::Error(Err::Code(0))
+    return IResult::Error(Err::Code(ErrorKind::Custom(0)))
     //return IResult::Done(&input[1..], b"")
   }
 
