@@ -8,7 +8,7 @@ use glium::{DisplayBuild, Surface};
 
 use glium::glutin;
 
-use nom::{IResult,HexDisplay};
+use nom::{IResult,HexDisplay,Offset};
 //use nom::util::*;
 use gif::*;
 use gif::parser::*;

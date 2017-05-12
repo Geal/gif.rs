@@ -4,8 +4,8 @@ version = "0.0.1"
 authors = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]
 
 [dependencies]
-glium = "~0.12"
-nom     = "~0.3"
+glium = "^0.16"
+nom     = "^3.0"
 
 [dependencies.gif]
 path = ".."

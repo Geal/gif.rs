@@ -4,5 +4,5 @@ version = "0.0.1"
 authors = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]
 
 [dependencies]
-nom       = "~1.2.0"
+nom       = "^3.0"
 byteorder = "0.3.5"

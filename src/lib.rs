@@ -8,6 +8,7 @@ pub mod parser;
 
 use nom::IResult::*;
 use nom::HexDisplay;
+use nom::Offset;
 
 enum State {
   Header,

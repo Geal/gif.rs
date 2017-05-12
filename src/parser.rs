@@ -1,4 +1,4 @@
-use nom::{HexDisplay,Needed,IResult,ErrorKind,be_u8,le_u8,le_u16,length_value};
+use nom::{HexDisplay,Offset,Needed,IResult,ErrorKind,be_u8,le_u8,le_u16};
 use nom::Err;
 use nom::IResult::*;
 use std::str::from_utf8;
@@ -7,13 +7,13 @@ use std::str::from_utf8;
 pub struct Gif;
 
 pub fn header(input:&[u8]) -> IResult<&[u8], Gif> {
-  chain!(input,
-    tag!("GIF")     ~
+  do_parse!(input,
+    tag!("GIF")     >>
     alt!(
       tag!("87a") |
       tag!("89a")
-   )                ,
-   || { Gif }
+   )                >>
+   ( Gif )
   )
 }
 
@@ -30,13 +30,13 @@ pub struct LogicalScreenDescriptor {
 }
 
 pub fn logical_screen_descriptor(input:&[u8]) -> IResult<&[u8], LogicalScreenDescriptor> {
-  chain!(input,
-    width:  le_u16 ~
-    height: le_u16 ~
-    fields: be_u8  ~
-    index:  be_u8  ~
-    ratio:  be_u8  ,
-   || {
+  do_parse!(input,
+    width:  le_u16 >>
+    height: le_u16 >>
+    fields: be_u8  >>
+    index:  be_u8  >>
+    ratio:  be_u8  >>
+   (
      LogicalScreenDescriptor {
        width:                  width,
        height:                 height,
@@ -47,15 +47,15 @@ pub fn logical_screen_descriptor(input:&[u8]) -> IResult<&[u8], LogicalScreenDes
        background_color_index: index,
        pixel_aspect_ratio:     ratio
      }
-   }
+   )
   )
 }
 
 pub fn header_and_logical_screen_descriptor(input: &[u8]) -> IResult<&[u8], LogicalScreenDescriptor> {
-  chain!(input,
-                header                    ~
-    descriptor: logical_screen_descriptor ,
-                || { descriptor }
+  do_parse!(input,
+                header                    >>
+    descriptor: logical_screen_descriptor >>
+                ( descriptor )
   )
 }
 
@@ -71,18 +71,18 @@ pub type GlobalColorTable = Vec<Color>;
 
 pub fn color_table(input:&[u8], count: u16) -> IResult<&[u8], GlobalColorTable> {
   count!(input,
-    chain!(
-      r: be_u8 ~
-      g: be_u8 ~
-      b: be_u8 ,
-      || {
+    do_parse!(
+      r: be_u8 >>
+      g: be_u8 >>
+      b: be_u8 >>
+      ({
         let mut v: Vec<u8> = Vec::new();
         v.push(r);
         v.push(g);
         v.push(b);
         //Color { r: r, g: g, b: b }
         v
-      }
+      })
     ),
     count as usize
   )
@@ -134,30 +134,30 @@ pub enum Block<'a> {
 
 
 pub fn application_extension<'a>(input: &'a[u8]) -> IResult<&'a[u8], Block<'a>> {
-  chain!(input,
-                tag!( &[0xff, 11][..] )       ~
-    identifier: map_res!(take!(8), from_utf8) ~
-    code:       take!(3)                      ~
-    data:       length_value                  ~
-                tag!( &[0][..] )              ,
-    || {
+  do_parse!(input,
+                tag!( &[0xff, 11][..] )       >>
+    identifier: map_res!(take!(8), from_utf8) >>
+    code:       take!(3)                      >>
+    data:       length_bytes!(be_u8)          >>
+                tag!( &[0][..] )              >>
+    (
       Block::ApplicationExtension(Application{
         identifier:          identifier,
         authentication_code: code,
         data:                data
       })
-    }
+    )
   )
 }
 
 named!(graphic_control<&[u8], GraphicControl>,
-  chain!(
-                  tag!( &[0xf9, 4][..] ) ~
-    fields:       be_u8                  ~
-    delay:        le_u16                 ~
-    transparency: be_u8                  ~
-                  tag!( &[0][..] )       ,
-    || {
+  do_parse!(
+                  tag!( &[0xf9, 4][..] ) >>
+    fields:       be_u8                  >>
+    delay:        le_u16                 >>
+    transparency: be_u8                  >>
+                  tag!( &[0][..] )       >>
+    (
       GraphicControl {
         disposal_method:    (fields & 0b00011100) >> 2,
         user_input:         fields & 0b00000010 == 0b00000010,
@@ -165,23 +165,23 @@ named!(graphic_control<&[u8], GraphicControl>,
         delay_time:         delay,
         transparency_index: transparency
       }
-    }
+    )
   )
 );
 
 named!(color<&[u8], Vec<u8> >,
-  chain!(
-    r: be_u8 ~
-    g: be_u8 ~
-    b: be_u8 ,
-    || {
+  do_parse!(
+    r: be_u8 >>
+    g: be_u8 >>
+    b: be_u8 >>
+    ({
       //Color { r: r, g: g, b: b }
       let mut v: Vec<u8> = Vec::new();
       v.push(r);
       v.push(g);
       v.push(b);
       v
-    }
+    })
   )
 );
 
@@ -191,19 +191,19 @@ fn count_color(input: &[u8], size: usize) -> IResult<&[u8], Vec<Vec<u8>>, u32> {
 
 named!(image_descriptor<&[u8], ImageDescriptor>,
 
-  chain!(
-            tag!( &[0x2C][..] ) ~
-    left:   le_u16              ~
-    top:    le_u16              ~
-    width:  le_u16              ~
-    height: le_u16              ~
-    fields: be_u8               ~
+  do_parse!(
+            tag!( &[0x2C][..] ) >>
+    left:   le_u16              >>
+    top:    le_u16              >>
+    width:  le_u16              >>
+    height: le_u16              >>
+    fields: be_u8               >>
     color_table:
       cond!(
         fields & 0b10000000 == 0b10000000,
         call!(count_color, 2u16.pow((1u16 + (fields as u16 & 0b00000111)) as u32) as usize)
-      ),
-    || {
+      ) >>
+    (
       ImageDescriptor{
         left_position:          left,
         top_position:           top,
@@ -215,7 +215,7 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
         local_color_table_size: 2u32.pow((1 + (fields as u16 & 0b00000111)) as u32),
         local_color_table:      color_table
       }
-    }
+    )
   )
 );
 
@@ -223,7 +223,7 @@ pub fn not_null(input: &[u8]) -> IResult<&[u8], u8> {
   if input.len() == 0 {
     IResult::Incomplete(Needed::Size(1))
   } else if input[0] == 0 {
-    IResult::Error(Err::Code(ErrorKind::Custom(0)))
+    IResult::Error(error_code!(ErrorKind::Custom(0)))
   } else {
     IResult::Done(&input[1..], input[0])
   }
@@ -232,11 +232,11 @@ pub fn not_null(input: &[u8]) -> IResult<&[u8], u8> {
 pub fn not_null_length_value(input:&[u8]) -> IResult<&[u8], &[u8]> {
   let input_len = input.len();
   if input_len == 0 {
-    return IResult::Error(Err::Code(ErrorKind::Custom(0)))
+    return IResult::Error(error_code!(ErrorKind::Custom(0)))
   }
   if input[0] == 0 {
     //println!("found empty sub block");
-    return IResult::Error(Err::Code(ErrorKind::Custom(0)))
+    return IResult::Error(error_code!(ErrorKind::Custom(0)))
     //return IResult::Done(&input[1..], b"")
   }
 
@@ -255,14 +255,14 @@ named!(sub_blocks<&[u8], Vec<&[u8]> >,
 );
 
 named!(table_based_image<&[u8], GraphicRenderingBlock>,
-  chain!(
-    descriptor:    image_descriptor ~
-    lzw_code_size: le_u8            ~
-    compressed:    sub_blocks       ~
-                tag!( &[0][..] )    ,
-    || {
+  do_parse!(
+    descriptor:    image_descriptor >>
+    lzw_code_size: le_u8            >>
+    compressed:    sub_blocks       >>
+                tag!( &[0][..] )    >>
+    (
       GraphicRenderingBlock::TableBasedImage(descriptor, lzw_code_size, compressed)
-    }
+    )
   )
 );
 named!(graphic_rendering_block<&[u8], GraphicRenderingBlock>,
@@ -275,25 +275,23 @@ named!(graphic_rendering_block<&[u8], GraphicRenderingBlock>,
 
 pub fn graphic_block(input:&[u8]) -> IResult<&[u8], Block> {
   println!("data for graphic block:\n{}", &input[..100].to_hex(8));
-  chain!(input,
-    control:   graphic_control ?       ~
-    rendering: graphic_rendering_block ,
-    || {
+  do_parse!(input,
+    control:   opt!(graphic_control)   >>
+    rendering: graphic_rendering_block >>
+    (
       Block::GraphicBlock(control, rendering)
-    }
+    )
   )
 }
 
 pub fn block(input:&[u8]) -> IResult<&[u8], Block> {
-  chain!(input,
-    tag!( "!" ) ~
-  blk: alt!(
-    application_extension
-  | graphic_block
-  ),
-  || {
-    blk
-  }
+  do_parse!(input,
+    tag!( "!" ) >>
+    blk: alt!(
+      application_extension
+    | graphic_block
+    )           >>
+  (blk)
   )
 }
 
