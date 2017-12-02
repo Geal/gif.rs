@@ -4,5 +4,5 @@ version = "0.0.1"
 authors = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]
 
 [dependencies]
-nom       = "^3.0"
+nom     = { git = "https://github.com/Geal/nom" }
 byteorder = "0.3.5"
