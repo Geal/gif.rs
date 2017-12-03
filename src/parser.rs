@@ -1,6 +1,5 @@
 use nom::{HexDisplay,Offset,Needed,IResult,ErrorKind,be_u8,le_u8,le_u16};
 use nom::Err;
-use nom::IResult::*;
 use std::str::from_utf8;
 
 #[derive(Debug,PartialEq,Eq)]
@@ -221,32 +220,32 @@ named!(image_descriptor<&[u8], ImageDescriptor>,
 
 pub fn not_null(input: &[u8]) -> IResult<&[u8], u8> {
   if input.len() == 0 {
-    IResult::Incomplete(Needed::Size(1))
+    Err(Err::Incomplete(Needed::Size(1)))
   } else if input[0] == 0 {
-    IResult::Error(error_code!(ErrorKind::Custom(0)))
+    Err(Err::Error(error_position!(input, ErrorKind::Custom(0))))
   } else {
-    IResult::Done(&input[1..], input[0])
+    Ok((&input[1..], input[0]))
   }
 }
 
 pub fn not_null_length_value(input:&[u8]) -> IResult<&[u8], &[u8]> {
   let input_len = input.len();
   if input_len == 0 {
-    return IResult::Error(error_code!(ErrorKind::Custom(0)))
+    return Err(Err::Error(error_position!(input, ErrorKind::Custom(0))))
   }
   if input[0] == 0 {
     //println!("found empty sub block");
-    return IResult::Error(error_code!(ErrorKind::Custom(0)))
-    //return IResult::Done(&input[1..], b"")
+    return Err(Err::Error(error_position!(input, ErrorKind::Custom(0))))
+    //return Ok((&input[1..], b""))
   }
 
   let len = input[0] as usize;
   if input_len - 1 >= len {
     //println!("found {} length in:\n{}", len, (&input[0..len+1]).to_hex(8));
     //println!("remaining:\n{}", (&input[len+1..len+20]).to_hex(8));
-    return IResult::Done(&input[len+1..], &input[1..len+1])
+    return Ok((&input[len+1..], &input[1..len+1]))
   } else {
-    return IResult::Incomplete(Needed::Size(1+len as usize))
+    return Err(Err::Incomplete(Needed::Size(1+len as usize)))
   }
 }
 
@@ -313,7 +312,7 @@ mod tests {
 
 
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("remaining:\n{}", &i[0..100].to_hex(8));
         println!("parsed: {:?}", o);
       },
@@ -332,7 +331,7 @@ mod tests {
 
 
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("remaining:\n{}", &i[0..100].to_hex(8));
         println!("parsed: {:?}", o);
       },
@@ -353,7 +352,7 @@ mod tests {
 
 
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
         assert_eq!(o, LogicalScreenDescriptor {
@@ -384,7 +383,7 @@ mod tests {
 
 
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
         assert_eq!(o, LogicalScreenDescriptor {
@@ -414,7 +413,7 @@ mod tests {
     // we know the color table size
     let res = color_table(data, 256);
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
       },
@@ -434,7 +433,7 @@ mod tests {
     // we know the color table size
     let res = color_table(data, 256);
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("offset: {:?}", d.offset(i));
         //println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
@@ -455,7 +454,7 @@ mod tests {
 
     let res = block(data);
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("offset: {:?}", d.offset(i));
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
@@ -477,7 +476,7 @@ mod tests {
 
     let res = block(data);
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("offset: {:?}", d.offset(i));
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
         println!("parsed: {:?}", o);
@@ -499,7 +498,7 @@ mod tests {
 
     let res = block(data);
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("offset: {:?}", d.offset(i));
         println!("parsed: {:?}", o);
         println!("remaining:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
@@ -520,14 +519,14 @@ mod tests {
 
     let res = block(data);
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("offset1: {:?}", d.offset(i));
         println!("parsed1: {:?}", o);
         //println!("remaining1:\n{}", &i[0..100].to_hex_from(8, d.offset(i)));
 
         let res2 = block(i);
         match res2 {
-          IResult::Done(i2, o2) => {
+          Ok((i2, o2)) => {
             println!("offset2: {:?}", d.offset(i2));
             println!("parsed2: {:?}", o2);
             //println!("remaining2:\n{}", &i2[0..100].to_hex_from(8, d.offset(i2)));
@@ -555,7 +554,7 @@ mod tests {
 
     let res = many_blocks(data);
     match res {
-      IResult::Done(i, o) => {
+      Ok((i, o)) => {
         println!("offset: {:?}", d.offset(i));
         println!("parsed: {:?}", o);
         println!("remaining:\n{}", i.to_hex(8));
@@ -576,7 +575,7 @@ mod tests {
 
     // we know the color table size
     match color_table(data, 256) {
-      IResult::Done(i, colors) => {
+      Ok((i, colors)) => {
         //println!("parsed: {:?}", colors);
         // allocate the image
         let mut buffer: Vec<u8> = Vec::with_capacity(400 * 300 * 3);
@@ -586,7 +585,7 @@ mod tests {
         //println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
         match graphic_block(data) {
-          IResult::Done(i, Block::GraphicBlock(opt_control, rendering)) => {
+          Ok((i, Block::GraphicBlock(opt_control, rendering))) => {
             //let (opt_control, rendering) = grb;
             match rendering {
               GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {
@@ -625,7 +624,7 @@ mod tests {
 
     // we know the color table size
     match color_table(data, 256) {
-      IResult::Done(i, colors) => {
+      Ok((i, colors)) => {
         println!("parsed: {:?}", colors);
         // allocate the image
         let mut buffer: Vec<u8> = Vec::with_capacity(2 * 2 * 3);
@@ -635,7 +634,7 @@ mod tests {
         //println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
         match graphic_block(data) {
-          IResult::Done(i, Block::GraphicBlock(opt_control, rendering)) => {
+          Ok((i, Block::GraphicBlock(opt_control, rendering))) => {
             //let (opt_control, rendering) = grb;
             println!("control: {:?}", opt_control);
             println!("rendering: {:?}", rendering);

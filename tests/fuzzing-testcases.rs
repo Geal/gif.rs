@@ -40,10 +40,10 @@ pub fn decode_gif (d:&[u8]) -> Option<usize> {
   //let d = &contents[..];
   //let data = &d[13..];
 
-  if let IResult::Done(data, logical_descriptor) = header_and_logical_screen_descriptor(d) {
+  if let Ok((data, logical_descriptor)) = header_and_logical_screen_descriptor(d) {
     // we know the color table size
     match color_table(data, 256) {
-      IResult::Done(_, colors) => {
+      Ok((_, colors)) => {
         println!("parsed: {:?}", colors);
         // allocate the image
         let mut buffer: Vec<u8> = Vec::with_capacity(400 * 300 * 3);
@@ -53,7 +53,7 @@ pub fn decode_gif (d:&[u8]) -> Option<usize> {
         println!("bytes:\n{}", &data[0..100].to_hex_from(8, d.offset(data)));
 
         match graphic_block(data) {
-          IResult::Done(_, Block::GraphicBlock(opt_control, rendering)) => {
+          Ok((_, Block::GraphicBlock(opt_control, rendering))) => {
             //let (opt_control, rendering) = grb;
             match rendering {
               GraphicRenderingBlock::TableBasedImage(descriptor, code_size, blocks) => {

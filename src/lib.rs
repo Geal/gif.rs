@@ -6,7 +6,6 @@ extern crate byteorder;
 pub mod lzw;
 pub mod parser;
 
-use nom::IResult::*;
 use nom::HexDisplay;
 use nom::Offset;
 
@@ -27,7 +26,7 @@ pub struct Decoder<'a> {
 impl<'a> Decoder<'a> {
   /// Creates a new GIF decoder
   pub fn initialize(d: &'a[u8]) -> Option<Decoder<'a>> {
-    if let Done(remaining, descriptor) = parser::header_and_logical_screen_descriptor(d) {
+    if let Ok((remaining, descriptor)) = parser::header_and_logical_screen_descriptor(d) {
       Some(Decoder {
         data:       d,
         position:   d.offset(remaining),
